@@ -1,0 +1,35 @@
+{
+    "name": "GCS to BigQuery",
+    "description": "A pipeline that reads files from Google Cloud Storage and loads them into BigQuery",
+    "parameters": [
+      {
+        "name": "input_file",
+        "label": "Input file pattern",
+        "helpText": "GCS file pattern to process (e.g., gs://your-bucket/path/to/files/*.csv)",
+        "paramType": "TEXT",
+        "isOptional": false
+      },
+      {
+        "name": "output_table",
+        "label": "Output BigQuery table",
+        "helpText": "BigQuery output table in the format: PROJECT:DATASET.TABLE",
+        "paramType": "TEXT",
+        "isOptional": false
+      },
+      {
+        "name": "schema",
+        "label": "BigQuery schema JSON",
+        "helpText": "JSON representation of BigQuery schema",
+        "paramType": "TEXT",
+        "isOptional": false
+      },
+      {
+        "name": "separator",
+        "label": "character separator",
+        "helpText": "Character used as field separator in CSV files (default: ,)",
+        "paramType": "TEXT",
+        "isOptional": true,
+        "defaultValue": ","
+      }
+    ]
+  }

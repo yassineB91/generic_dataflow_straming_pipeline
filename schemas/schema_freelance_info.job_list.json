@@ -1,0 +1,14 @@
+{
+    "fields": [
+        {"name": "job", "type": "STRING"},
+        {"name": "profil", "type": "STRING"},
+        {"name": "sector", "type": "STRING"},
+        {"name": "description", "type": "STRING"},
+        {"name": "skills", "type": "STRING"},
+        {"name": "publish_date", "type": "STRING"},
+        {"name": "location", "type": "STRING"},
+        {"name": "start_date", "type": "STRING"},
+        {"name": "duration", "type": "STRING"},
+        {"name": "insert_date", "type": "timestamp", "mode": "required"}        
+        ]   
+}

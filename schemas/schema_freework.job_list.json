@@ -1,0 +1,14 @@
+{
+    "fields": [
+        {"name": "title", "type": "STRING"},
+        {"name": "start", "type": "STRING"},
+        {"name": "duration", "type": "STRING"},
+        {"name": "salary_tjm", "type": "STRING"},
+        {"name": "experience", "type": "STRING"},
+        {"name": "remote", "type": "STRING"},
+        {"name": "location", "type": "STRING"},
+        {"name": "description", "type": "STRING"},
+        {"name": "key_skills", "type": "STRING"},
+        {"name": "insert_date", "type": "timestamp", "mode": "required"}        
+        ]   
+}

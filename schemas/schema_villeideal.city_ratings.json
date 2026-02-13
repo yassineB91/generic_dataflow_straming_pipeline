@@ -1,0 +1,15 @@
+{
+    "fields": [
+      {"name": "city", "type": "STRING"},
+      {"name": "commerce", "type": "STRING"},
+      {"name": "culture", "type": "STRING"},
+      {"name": "education", "type": "STRING"},
+      {"name": "environment", "type": "STRING"},
+      {"name": "quality_of_life", "type": "STRING"},
+      {"name": "health", "type": "STRING"},
+      {"name": "sports_and_leisure", "type": "STRING"},
+      {"name": "security", "type": "STRING"},
+      {"name": "transportation", "type": "STRING"},
+      {"name": "insert_date", "type": "TIMESTAMP", "mode": "REQUIRED"}
+    ]
+  }

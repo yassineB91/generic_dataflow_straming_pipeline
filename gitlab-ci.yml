@@ -1,0 +1,53 @@
+stages:
+  - upload_template
+  - build
+  - deploy
+
+variables:
+  IMAGE_NAME: "dataflow_flex_templates_image"
+  REGION: "europe-west1"
+  GCP_PROJECT_ID: "processing-452316"
+  BUCKET_NAME: "dataflow_templ_bucket"
+
+before_script:
+  # Decode and set up the service account key
+  - echo "$GCP_SERVICE_KEY" | base64 -d > "${CI_PROJECT_DIR}/gcloud-service-key.json"
+  - gcloud auth activate-service-account --key-file="${CI_PROJECT_DIR}/gcloud-service-key.json"
+  - gcloud config set project "$GCP_PROJECT_ID"
+
+
+upload_template:
+  stage: build
+  image: google/cloud-sdk:latest
+  script:
+    # Upload the template to GCS
+    - gsutil cp "${CI_PROJECT_DIR}/metadata.json" "gs://${GCP_PROJECT_ID}/${BUCKET_NAME}/"
+    - gsutil cp -r "${CI_PROJECT_DIR}/schemas" "gs://${GCP_PROJECT_ID}/${BUCKET_NAME}/"
+  only:
+    - main
+
+build:
+  stage: build
+  image: google/cloud-sdk:latest
+  script:
+    # Submit a build to Google Cloud Build
+    - gcloud builds submit --tag gcr.io/${GCP_PROJECT_ID}/${IMAGE_NAME} .
+  only:
+    - main
+  needs:
+    - upload_template
+
+deploy_template:
+  stage: deploy
+  image: google/cloud-sdk:latest
+  script:
+    # Deploy the container to Cloud Run
+    - gcloud dataflow flex flex-template build "gs://${GCP_PROJECT_ID}/${BUCKET_NAME}/metadata.json" 
+      --image=gcr.io/${GCP_PROJECT_ID}/${IMAGE_NAME}
+      --sdk-language="PYTHON"
+      --metadata-file="${CI_PROJECT_DIR}/metadata.json"
+
+  only:
+    - main
+  needs:
+    - build

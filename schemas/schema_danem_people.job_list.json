@@ -1,0 +1,12 @@
+{
+    "fields": [
+        {"name": "location_country", "type": "STRING"},
+        {"name": "location_region", "type": "STRING"},
+        {"name": "job_type", "type": "STRING"},
+        {"name": "salary_tjm", "type": "STRING"},
+        {"name": "description", "type": "STRING"},
+        {"name": "sector", "type": "STRING"},
+        {"name": "link", "type": "STRING"},
+        {"name": "insert_date", "type": "timestamp", "mode": "required"}        
+        ]   
+}
