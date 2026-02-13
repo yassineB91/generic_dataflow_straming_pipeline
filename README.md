@@ -1,93 +1,129 @@
-# Dataflow
+# Generic Dataflow Streaming Pipeline
 
+Apache Beam/Dataflow pipeline to ingest files from Google Cloud Storage (GCS) and load them into BigQuery.
 
+## What This Repository Contains
 
-## Getting started
+- `load_gcs_to_bq.py`: Main Beam pipeline designed for Dataflow Flex Template runtime parameters (uses `ValueProvider`).
+- `load_gcs_to_bq_local.py`: Alternative entrypoint using argparse (useful for local/manual runs).
+- `metadata.json`: Flex Template metadata and runtime parameter definitions.
+- `schemas/*.json`: Example BigQuery schemas.
+- `Dockerfile`: Container image for Dataflow Flex Template.
+- `.gitlab-ci.yml`: CI pipeline to upload metadata/schemas, build image, and build Dataflow Flex Template.
 
-To make it easy for you to get started with GitLab, here's a list of recommended next steps.
+## Pipeline Behavior
 
-Already a pro? Just edit this README.md and make it your own. Want to make it easy? [Use the template at the bottom](#editing-this-readme)!
+The pipeline:
 
-## Add your files
+1. Matches files from `--input_file` (GCS pattern).
+2. Reads each file.
+3. Parses supported formats:
+   - `csv` / `txt`: first line is treated as header and skipped; columns are mapped using schema field order.
+   - `json`: expects a JSON array.
+   - `jsonl`: expects one JSON object per line.
+4. Appends rows to BigQuery (`WRITE_APPEND`), using `FILE_LOADS`.
 
-- [ ] [Create](https://docs.gitlab.com/ee/user/project/repository/web_editor.html#create-a-file) or [upload](https://docs.gitlab.com/ee/user/project/repository/web_editor.html#upload-a-file) files
-- [ ] [Add files using the command line](https://docs.gitlab.com/ee/gitlab-basics/add-file.html#add-a-file-using-the-command-line) or push an existing Git repository with the following command:
+For CSV/TXT records, an `insert_date` field is added automatically with current timestamp.
 
+## Prerequisites
+
+- Python 3.9+
+- Google Cloud project with:
+  - Dataflow API enabled
+  - BigQuery API enabled
+  - Cloud Storage access
+- A service account with permissions for Dataflow, GCS, and BigQuery
+
+## Local Setup
+
+Install dependencies:
+
+```bash
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+pip install "apache-beam[gcp]==2.45.0"
 ```
-cd existing_repo
-git remote add origin https://gitlab.com/yassine.belmaaza1/dataflow.git
-git branch -M main
-git push -uf origin main
+
+## Run Locally (DirectRunner)
+
+```bash
+python load_gcs_to_bq_local.py \
+  --runner DirectRunner \
+  --project processing-452316 \
+  --input_file "gs://your-bucket/path/*.csv" \
+  --output_table "processing-452316:your_dataset.your_table" \
+  --schema "schemas/schema_freework.job_list.json" \
+  --separator ","
 ```
 
-## Integrate with your tools
+## Run on Dataflow (without Flex Template)
 
-- [ ] [Set up project integrations](https://gitlab.com/yassine.belmaaza1/dataflow/-/settings/integrations)
+```bash
+python load_gcs_to_bq_local.py \
+  --runner DataflowRunner \
+  --project processing-452316 \
+  --service_account_email "your-sa@processing-452316.iam.gserviceaccount.com" \
+  --input_file "gs://your-bucket/path/*.csv" \
+  --output_table "processing-452316:your_dataset.your_table" \
+  --schema "schemas/schema_freework.job_list.json" \
+  --separator "," \
+  --region europe-west1
+```
 
-## Collaborate with your team
+## Build and Run as Flex Template
 
-- [ ] [Invite team members and collaborators](https://docs.gitlab.com/ee/user/project/members/)
-- [ ] [Create a new merge request](https://docs.gitlab.com/ee/user/project/merge_requests/creating_merge_requests.html)
-- [ ] [Automatically close issues from merge requests](https://docs.gitlab.com/ee/user/project/issues/managing_issues.html#closing-issues-automatically)
-- [ ] [Enable merge request approvals](https://docs.gitlab.com/ee/user/project/merge_requests/approvals/)
-- [ ] [Set auto-merge](https://docs.gitlab.com/ee/user/project/merge_requests/merge_when_pipeline_succeeds.html)
+Build container image:
 
-## Test and Deploy
+```bash
+gcloud builds submit --tag gcr.io/processing-452316/dataflow_flex_templates_image .
+```
 
-Use the built-in continuous integration in GitLab.
+Build Flex Template:
 
-- [ ] [Get started with GitLab CI/CD](https://docs.gitlab.com/ee/ci/quick_start/)
-- [ ] [Analyze your code for known vulnerabilities with Static Application Security Testing (SAST)](https://docs.gitlab.com/ee/user/application_security/sast/)
-- [ ] [Deploy to Kubernetes, Amazon EC2, or Amazon ECS using Auto Deploy](https://docs.gitlab.com/ee/topics/autodevops/requirements.html)
-- [ ] [Use pull-based deployments for improved Kubernetes management](https://docs.gitlab.com/ee/user/clusters/agent/)
-- [ ] [Set up protected environments](https://docs.gitlab.com/ee/ci/environments/protected_environments.html)
+```bash
+gcloud dataflow flex-template build gs://dataflow_templ_bucket/metadata.json \
+  --image gcr.io/processing-452316/dataflow_flex_templates_image \
+  --sdk-language PYTHON \
+  --metadata-file metadata.json
+```
 
-***
+Run Flex Template job:
 
-# Editing this README
+```bash
+gcloud dataflow flex-template run gcs-to-bq-$(date +%Y%m%d-%H%M%S) \
+  --template-file-gcs-location gs://dataflow_templ_bucket/metadata.json \
+  --region europe-west1 \
+  --parameters input_file="gs://your-bucket/path/*.csv" \
+  --parameters output_table="processing-452316:your_dataset.your_table" \
+  --parameters schema="schemas/schema_freework.job_list.json" \
+  --parameters separator=","
+```
 
-When you're ready to make this README your own, just edit this file and use the handy template below (or feel free to structure it however you want - this is just a starting point!). Thanks to [makeareadme.com](https://www.makeareadme.com/) for this template.
+## Runtime Parameters
 
-## Suggestions for a good README
+Defined in `metadata.json`:
 
-Every project is different, so consider which of these sections apply to yours. The sections used in the template are suggestions for most open source projects. Also keep in mind that while a README can be too long and detailed, too long is better than too short. If you think your README is too long, consider utilizing another form of documentation rather than cutting out information.
+- `input_file` (required): GCS file pattern (`gs://bucket/path/*.csv`)
+- `output_table` (required): BigQuery table (`PROJECT:DATASET.TABLE`)
+- `schema` (required): schema JSON path
+- `separator` (optional): CSV separator (default `,`)
 
-## Name
-Choose a self-explaining name for your project.
+## Notes and Limitations
 
-## Description
-Let people know what your project can do specifically. Provide context and add a link to any reference visitors might be unfamiliar with. A list of Features or a Background subsection can also be added here. If there are alternatives to your project, this is a good place to list differentiating factors.
+- Staging and temp buckets are hardcoded in scripts:
+  - `gs://dataflow_bucket_processing-452316/staging`
+  - `gs://dataflow_bucket_processing-452316/temp`
+- Region is hardcoded to `europe-west1` in both Python entrypoints.
+- CSV parsing is split-based and does not handle quoted separators robustly.
+- `requirements.txt` does not include Apache Beam; install it separately (or add it to requirements).
 
-## Badges
-On some READMEs, you may see small images that convey metadata, such as whether or not all the tests are passing for the project. You can use Shields to add some to your README. Many services also have instructions for adding a badge.
+## CI/CD
 
-## Visuals
-Depending on what you are making, it can be a good idea to include screenshots or even a video (you'll frequently see GIFs rather than actual videos). Tools like ttygif can help, but check out Asciinema for a more sophisticated method.
+GitLab CI (`.gitlab-ci.yml`) currently defines three stages:
 
-## Installation
-Within a particular ecosystem, there may be a common way of installing things, such as using Yarn, NuGet, or Homebrew. However, consider the possibility that whoever is reading your README is a novice and would like more guidance. Listing specific steps helps remove ambiguity and gets people to using your project as quickly as possible. If it only runs in a specific context like a particular programming language version or operating system or has dependencies that have to be installed manually, also add a Requirements subsection.
+1. Upload `metadata.json` and `schemas/` to GCS
+2. Build and push container image with Cloud Build
+3. Build Dataflow Flex Template
 
-## Usage
-Use examples liberally, and show the expected output if you can. It's helpful to have inline the smallest example of usage that you can demonstrate, while providing links to more sophisticated examples if they are too long to reasonably include in the README.
-
-## Support
-Tell people where they can go to for help. It can be any combination of an issue tracker, a chat room, an email address, etc.
-
-## Roadmap
-If you have ideas for releases in the future, it is a good idea to list them in the README.
-
-## Contributing
-State if you are open to contributions and what your requirements are for accepting them.
-
-For people who want to make changes to your project, it's helpful to have some documentation on how to get started. Perhaps there is a script that they should run or some environment variables that they need to set. Make these steps explicit. These instructions could also be useful to your future self.
-
-You can also document commands to lint the code or run tests. These steps help to ensure high code quality and reduce the likelihood that the changes inadvertently break something. Having instructions for running tests is especially helpful if it requires external setup, such as starting a Selenium server for testing in a browser.
-
-## Authors and acknowledgment
-Show your appreciation to those who have contributed to the project.
-
-## License
-For open source projects, say how it is licensed.
-
-## Project status
-If you have run out of energy or time for your project, put a note at the top of the README saying that development has slowed down or stopped completely. Someone may choose to fork your project or volunteer to step in as a maintainer or owner, allowing your project to keep going. You can also make an explicit request for maintainers.
+Ensure `GCP_SERVICE_KEY` is configured in CI variables (base64-encoded service account key).
